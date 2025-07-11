@@ -97,13 +97,13 @@ func initDB(db *sql.DB) error {
 		}
 		// Admin: all permissions
 		_, err = db.Exec(`INSERT INTO users (username, password, role, permissions) VALUES (?, ?, ?, ?)`,
-			"brick-admin", string(adminPass), "admin", "edit_users,view_logs,delete_users,view_profile")
+			"brick-admin", string(adminPass), "admin", "clock/view,clock/clients,clock/server-mode,clock/servers")
 		if err != nil {
 			return err
 		}
 		// Common user: limited permissions
 		_, err = db.Exec(`INSERT INTO users (username, password, role, permissions) VALUES (?, ?, ?, ?)`,
-			"brick", string(userPass), "user", "view_profile")
+			"brick", string(userPass), "user", "clock/view,clock/clients")
 		if err != nil {
 			return err
 		}

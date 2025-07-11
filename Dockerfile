@@ -3,6 +3,8 @@ FROM golang:1.21-alpine AS builder
 WORKDIR /app
 COPY . .
 
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+
 # Build arguments for version
 ARG VERSION=0.1.0-dev
 ARG BUILD_DATETIME
