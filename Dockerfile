@@ -28,6 +28,7 @@ COPY --from=builder /app/brick-auth .
 COPY --from=builder /app/go.mod .
 COPY --from=builder /app/VERSION .
 COPY --from=builder /app/build-info.json .
+COPY private_rsa_pkcs1.pem /app/private.pem
 RUN apk add --no-cache sqlite-libs
 EXPOSE 18001
 ENTRYPOINT ["/app/brick-auth"] 

@@ -8,11 +8,13 @@ import (
 	"os"
 	"strings"
 	"time"
-
+	"io/ioutil"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
 	"github.com/golang-jwt/jwt/v5"
-	"io/ioutil"
 )
 
 var (
@@ -47,7 +49,8 @@ func loadBuildInfo() *BuildInfo {
 	return &buildInfo
 }
 
-var jwtKey = []byte("replace_with_secret_key")
+var privateKey *rsa.PrivateKey
+var publicKey *rsa.PublicKey
 
 // User struct for DB
 type User struct {
@@ -121,6 +124,29 @@ func main() {
 		log.Fatalf("DB init error: %v", err)
 	}
 
+	// Load RSA private key
+	privPem, err := ioutil.ReadFile("/app/private.pem")
+	if err != nil {
+		log.Fatalf("Failed to read private.pem: %v", err)
+	}
+	block, _ := pem.Decode(privPem)
+	if block == nil {
+		log.Fatalf("Failed to decode PEM block containing private key")
+	}
+	var parsedKey interface{}
+	if block.Type == "RSA PRIVATE KEY" {
+		parsedKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+	} else if block.Type == "PRIVATE KEY" {
+		parsedKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+	} else {
+		log.Fatalf("Unknown key type %s", block.Type)
+	}
+	privateKey, ok := parsedKey.(*rsa.PrivateKey)
+	if !ok || err != nil {
+		log.Fatalf("Failed to parse private key: %v", err)
+	}
+	publicKey = &privateKey.PublicKey
+
 	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
@@ -154,8 +180,8 @@ func main() {
 				ExpiresAt: jwt.NewNumericDate(expirationTime),
 			},
 		}
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-		tokenString, err := token.SignedString(jwtKey)
+		token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+		tokenString, err := token.SignedString(privateKey)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Could not create token"})
 			return
@@ -171,7 +197,7 @@ func main() {
 		}
 		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-			return jwtKey, nil
+			return publicKey, nil
 		})
 		if err != nil || !token.Valid {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Invalid token"})
@@ -188,7 +214,7 @@ func main() {
 		}
 		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-			return jwtKey, nil
+			return publicKey, nil
 		})
 		if err != nil || !token.Valid {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Invalid token"})
@@ -196,8 +222,8 @@ func main() {
 		}
 		expirationTime := time.Now().Add(15 * time.Minute)
 		claims.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(expirationTime)
-		token = jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-		tokenString, err := token.SignedString(jwtKey)
+		token = jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+		tokenString, err := token.SignedString(privateKey)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Could not refresh token"})
 			return
@@ -213,7 +239,7 @@ func main() {
 		}
 		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-			return jwtKey, nil
+			return publicKey, nil
 		})
 		if err != nil || !token.Valid {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "Invalid token"})
