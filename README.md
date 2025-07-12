@@ -1,94 +1,87 @@
 # Brick Auth Service
 
-A stateless JWT authentication service for Brick, supporting roles and permissions, with version/build info endpoints and robust Docker/test integration.
+Brick 认证服务，提供用户认证、JWT 令牌管理和权限控制功能。
 
-## Features
-- JWT-based authentication (no sessions/cookies)
-- Role and permission support in JWT claims
-- Version and build info via `/version` endpoint
-- Docker-ready, with reproducible builds
-- Automated test script for all endpoints
+## 目录结构
 
-## Endpoints
-
-### Authentication
-- **POST /login**
-  - Request: `{ "username": "...", "password": "..." }`
-  - Response: `{ "token": "..." }`
-
-- **POST /validate**
-  - Header: `Authorization: Bearer <token>`
-  - Response: `{ "valid": true, "user": { ... } }`
-
-- **POST /refresh**
-  - Header: `Authorization: Bearer <token>`
-  - Response: `{ "token": "..." }`
-
-- **GET /me**
-  - Header: `Authorization: Bearer <token>`
-  - Response: `{ "user": { ... } }`
-
-### Version/Build Info
-- **GET /version**
-  - Response:
-    ```json
-    {
-      "version": "0.1.0-dev",
-      "buildInfo": {
-        "version": "0.1.0-dev",
-        "buildDateTime": "2025-07-10T14:20:30Z",
-        "buildTimestamp": 1752157313,
-        "environment": "production",
-        "service": "brick-auth",
-        "description": "Brick Auth Service"
-      },
-      "error": ""
-    }
-    ```
-
-## Roles & Permissions
-- JWT claims include both `role` and `permissions` fields.
-- Permissions are a list of allowed actions (e.g., `edit_users`, `view_profile`).
-- Roles are strings (e.g., `admin`, `user`).
-
-## Default Users
-- **brick-admin**: password `brickadminpass`, role `admin`, all permissions
-- **brick**: password `brickpass`, role `user`, limited permissions
-
-## Docker Usage
-
-### Build
-```bash
-./scripts/build.sh
+```
+brick-auth/
+├── main.go                 # 主应用程序
+├── Dockerfile             # Docker 构建文件
+├── go.mod                 # Go 模块文件
+├── private_rsa_pkcs1.pem # RSA 私钥文件
+├── scripts/               # 脚本文件
+│   └── test.sh
+└── README.md             # 本文档
 ```
 
-### Run
+## 容器化最佳实践
+
+### 目录结构
+- `/etc/brick/auth/` - 配置文件
+- `/var/log/brick/auth/` - 日志文件
+- `/data/brick/auth/` - 数据文件
+- `/app/brick-auth/` - 应用程序文件
+
+### 环境变量
+- `CONFIG_PATH` - 配置文件路径 (默认: `/etc/brick/auth`)
+- `LOG_PATH` - 日志文件路径 (默认: `/var/log/brick/auth`)
+- `DATA_PATH` - 数据文件路径 (默认: `/data/brick/auth`)
+- `JWT_SECRET` - JWT 密钥
+- `ENVIRONMENT` - 运行环境
+
+### 安全特性
+- 非 root 用户运行 (brick:1000)
+- 标准 Linux 目录结构
+- 健康检查端点
+- 环境变量配置
+- 合并的 RUN 命令减少镜像层数
+
+## 构建和运行
+
+### 本地构建
 ```bash
-./scripts/quick_start.sh run
+docker build -t brick-auth:latest .
 ```
 
-### Test
+### 使用 Docker Compose
 ```bash
-./scripts/test.sh
+cd ../brick-deployment
+docker-compose up auth
 ```
 
-### Clean
+### 健康检查
 ```bash
-./scripts/clean.sh --image
+curl http://localhost:17001/health
 ```
 
-## Test Script
-- `./scripts/test.sh` runs a full suite of endpoint tests, including login, token validation, refresh, and version info.
-- Waits for the API to be ready before running tests.
-- Prints a summary of passed/failed tests.
+### 版本信息
+```bash
+curl http://localhost:17001/version
+```
 
-## Development
-- The service stores its SQLite DB in `/app/data/users.db` inside the container by default.
-- Version and build info are injected at build time and available via `/version` and `/app/build-info.json`.
+## API 端点
 
-## Security Notes
-- Change the JWT secret (`jwtKey` in `main.go`) for production use.
-- Use Docker volume mounts for persistent DB storage in production.
+- `POST /login` - 用户登录
+- `POST /validate` - 验证 JWT 令牌
+- `GET /health` - 健康检查
+- `GET /version` - 版本信息
 
-## License
-MIT 
+## 监控和日志
+
+日志文件位置：`/var/log/brick/auth/app.log`
+
+健康检查端点：`http://localhost:17001/health`
+
+## 默认用户
+
+- **brick-admin** / brickadminpass (管理员权限)
+- **brick** / brickpass (普通用户权限)
+
+## 技术特点
+
+- 使用 SQLite 数据库存储用户信息
+- RSA 密钥对进行 JWT 签名
+- bcrypt 密码哈希
+- 基于角色的权限控制
+- 15分钟 JWT 令牌过期时间 
