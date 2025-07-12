@@ -3,73 +3,20 @@ package main
 import (
 	"context"
 	"crypto/rsa"
-	"crypto/x509"
-	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-// Config holds application configuration
-type Config struct {
-	Server   ServerConfig   `json:"server"`
-	Database DatabaseConfig `json:"database"`
-	Auth     AuthConfig     `json:"auth"`
-}
-
-type ServerConfig struct {
-	Port string `json:"port"`
-	Host string `json:"host"`
-}
-
-type DatabaseConfig struct {
-	Path string `json:"path"`
-}
-
-type AuthConfig struct {
-	PrivateKeyPath string `json:"private_key_path"`
-	TokenExpiry    int    `json:"token_expiry"`
-}
-
-// User model
-type User struct {
-	gorm.Model
-	Username   string `json:"username" gorm:"unique"`
-	Password   string `json:"password"`
-	Role       string `json:"role"`
-	Permissions string `json:"permissions"` // comma-separated
-}
-
-// Token model
-type Token struct {
-	gorm.Model
-	UserID    uint      `json:"user_id"`
-	Token     string    `json:"token" gorm:"unique"`
-	ExpiresAt time.Time `json:"expires_at"`
-}
-
-// Claims for JWT
-type Claims struct {
-	UserID      int      `json:"user_id"`
-	Username    string   `json:"username"`
-	Role        string   `json:"role"`
-	Permissions []string `json:"permissions"`
-	jwt.RegisteredClaims
-}
-
+// Global variables
 var (
 	AppVersion    = "0.1.0-dev"
 	BuildDateTime = "2025-07-10T13:00:00Z"
@@ -77,14 +24,6 @@ var (
 	privateKey    *rsa.PrivateKey
 	config        Config
 )
-
-// getEnvWithDefault returns environment variable value or default
-func getEnvWithDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
 
 // ensureDirectories creates necessary directories
 func ensureDirectories() error {
@@ -103,140 +42,6 @@ func ensureDirectories() error {
 	return nil
 }
 
-// loadConfig loads configuration from file or environment
-func loadConfig() error {
-	configPath := getEnvWithDefault("BRICK_AUTH_CONFIG_PATH", "/etc/brick-auth/config.json")
-	
-	// Set default configuration
-	config = Config{
-		Server: ServerConfig{
-			Port: getEnvWithDefault("BRICK_AUTH_PORT", "17001"),
-			Host: getEnvWithDefault("BRICK_AUTH_HOST", "0.0.0.0"),
-		},
-		Database: DatabaseConfig{
-			Path: getEnvWithDefault("BRICK_AUTH_DB_PATH", "/var/lib/brick-auth/auth.db"),
-		},
-		Auth: AuthConfig{
-			PrivateKeyPath: getEnvWithDefault("BRICK_AUTH_PRIVATE_KEY_PATH", "/app/private.pem"),
-			TokenExpiry:    3600, // 1 hour
-		},
-	}
-
-	// Try to load from config file if it exists
-	if _, err := os.Stat(configPath); err == nil {
-		file, err := os.Open(configPath)
-		if err != nil {
-			return fmt.Errorf("failed to open config file: %w", err)
-		}
-		defer file.Close()
-
-		if err := json.NewDecoder(file).Decode(&config); err != nil {
-			return fmt.Errorf("failed to decode config file: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// loadPrivateKey loads the RSA private key
-func loadPrivateKey() error {
-	keyData, err := os.ReadFile(config.Auth.PrivateKeyPath)
-	if err != nil {
-		return fmt.Errorf("failed to read private key: %w", err)
-	}
-
-	block, _ := pem.Decode(keyData)
-	if block == nil {
-		return fmt.Errorf("failed to decode PEM block")
-	}
-
-	var parsedKey interface{}
-	if block.Type == "RSA PRIVATE KEY" {
-		parsedKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-	} else if block.Type == "PRIVATE KEY" {
-		parsedKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
-	} else {
-		return fmt.Errorf("unknown key type %s", block.Type)
-	}
-	
-	if err != nil {
-		return fmt.Errorf("failed to parse private key: %w", err)
-	}
-
-	key, ok := parsedKey.(*rsa.PrivateKey)
-	if !ok {
-		return fmt.Errorf("key is not an RSA private key")
-	}
-
-	privateKey = key
-	return nil
-}
-
-// initDatabase initializes the database
-func initDatabase() error {
-	var err error
-	db, err = gorm.Open(sqlite.Open(config.Database.Path), &gorm.Config{})
-	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	// Auto migrate the schema
-	if err := db.AutoMigrate(&User{}, &Token{}); err != nil {
-		return fmt.Errorf("failed to migrate database: %w", err)
-	}
-
-	// Check if users exist
-	var count int64
-	db.Model(&User{}).Count(&count)
-	if count == 0 {
-		// Create default users
-		adminPass, err := bcrypt.GenerateFromPassword([]byte("brickadminpass"), bcrypt.DefaultCost)
-		if err != nil {
-			return fmt.Errorf("failed to hash admin password: %w", err)
-		}
-		userPass, err := bcrypt.GenerateFromPassword([]byte("brickpass"), bcrypt.DefaultCost)
-		if err != nil {
-			return fmt.Errorf("failed to hash user password: %w", err)
-		}
-
-		// Admin: all permissions
-		adminUser := User{
-			Username:   "brick-admin",
-			Password:   string(adminPass),
-			Role:       "admin",
-			Permissions: "clock/view,clock/clients,clock/server-mode,clock/servers",
-		}
-		if err := db.Create(&adminUser).Error; err != nil {
-			return fmt.Errorf("failed to create admin user: %w", err)
-		}
-
-		// Common user: limited permissions
-		user := User{
-			Username:   "brick",
-			Password:   string(userPass),
-			Role:       "user",
-			Permissions: "clock/view,clock/clients",
-		}
-		if err := db.Create(&user).Error; err != nil {
-			return fmt.Errorf("failed to create user: %w", err)
-		}
-
-		log.Println("Initialized DB with default users: brick-admin/brickadminpass and brick/brickpass")
-	}
-
-	return nil
-}
-
-
-
-// healthCheck endpoint
-func healthCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"status": "healthy",
-		"time":   time.Now().UTC(),
-	})
-}
-
 // BuildInfo struct
 type BuildInfo struct {
 	Version        string `json:"version"`
@@ -247,174 +52,27 @@ type BuildInfo struct {
 	Description    string `json:"description"`
 }
 
-// loadBuildInfo loads build information from file
+// loadBuildInfo loads build information
 func loadBuildInfo() *BuildInfo {
-	data, err := os.ReadFile("/app/build-info.json")
-	if err != nil {
-		return nil
+	return &BuildInfo{
+		Version:        AppVersion,
+		BuildDateTime:  BuildDateTime,
+		BuildTimestamp: time.Now().Unix(),
+		Environment:    "production",
+		Service:        "brick-auth",
+		Description:    "Brick Authentication Service",
 	}
-	var buildInfo BuildInfo
-	if err := json.Unmarshal(data, &buildInfo); err != nil {
-		return nil
-	}
-	return &buildInfo
-}
-
-// version endpoint
-func version(c *gin.Context) {
-	buildInfo := loadBuildInfo()
-	response := gin.H{
-		"version":        AppVersion,
-		"build_datetime": BuildDateTime,
-		"service":        "brick-auth",
-	}
-	if buildInfo != nil {
-		response["build_info"] = buildInfo
-	}
-	c.JSON(http.StatusOK, response)
-}
-
-// Helper function to get bearer token
-func getBearerToken(c *gin.Context) string {
-	auth := c.GetHeader("Authorization")
-	if len(auth) > 7 && auth[:7] == "Bearer " {
-		return auth[7:]
-	}
-	return ""
-}
-
-// Login handler
-func loginHandler(c *gin.Context) {
-	var creds struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	
-	if err := c.ShouldBindJSON(&creds); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
-		return
-	}
-
-	var user User
-	if err := db.Where("username = ?", creds.Username).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-		return
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(creds.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-		return
-	}
-
-	permissions := []string{}
-	if user.Permissions != "" {
-		permissions = strings.Split(user.Permissions, ",")
-	}
-
-	expirationTime := time.Now().Add(15 * time.Minute)
-	claims := &Claims{
-		UserID:      int(user.ID),
-		Username:    user.Username,
-		Role:        user.Role,
-		Permissions: permissions,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	tokenString, err := token.SignedString(privateKey)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create token"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
-}
-
-// Validate token handler
-func validateTokenHandler(c *gin.Context) {
-	tokenStr := getBearerToken(c)
-	if tokenStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token"})
-		return
-	}
-
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-		return &privateKey.PublicKey, nil
-	})
-	
-	if err != nil || !token.Valid {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"valid":       true,
-		"user_id":     claims.UserID,
-		"username":    claims.Username,
-		"role":        claims.Role,
-		"permissions": claims.Permissions,
-	})
-}
-
-// Refresh token handler
-func refreshTokenHandler(c *gin.Context) {
-	tokenStr := getBearerToken(c)
-	if tokenStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token"})
-		return
-	}
-
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-		return &privateKey.PublicKey, nil
-	})
-	
-	if err != nil || !token.Valid {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-		return
-	}
-
-	expirationTime := time.Now().Add(15 * time.Minute)
-	claims.RegisteredClaims.ExpiresAt = jwt.NewNumericDate(expirationTime)
-	
-	newToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	tokenString, err := newToken.SignedString(privateKey)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not refresh token"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
-}
-
-// Get current user info handler
-func meHandler(c *gin.Context) {
-	tokenStr := getBearerToken(c)
-	if tokenStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token"})
-		return
-	}
-
-	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-		return &privateKey.PublicKey, nil
-	})
-	
-	if err != nil || !token.Valid {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"user": claims})
 }
 
 func main() {
 	// Load configuration
 	if err := loadConfig(); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Validate configuration
+	if err := validateConfig(); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
 	}
 
 	// Ensure directories exist
@@ -432,13 +90,28 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-
+	// Start cleanup routine
+	startCleanupRoutine()
 
 	// Set Gin mode
 	gin.SetMode(gin.ReleaseMode)
 
 	// Create router
 	r := gin.Default()
+
+	// Add CORS middleware
+	r.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+		
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		
+		c.Next()
+	})
 
 	// Add health check endpoint
 	r.GET("/health", healthCheck)
@@ -453,10 +126,49 @@ func main() {
 	r.POST("/refresh", refreshTokenHandler)
 	r.GET("/me", meHandler)
 
-	// Create server
+	// Add super-admin management routes
+	admin := r.Group("/admin")
+	admin.Use(func(c *gin.Context) {
+		// Check if user is super-admin
+		claims, err := getCurrentUserClaims(c)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+			c.Abort()
+			return
+		}
+		if claims.Role != "super-admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Super-admin access required"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	})
+
+	// User management
+	admin.GET("/users", listUsersHandler)
+	admin.POST("/users", createUserHandler)
+	admin.PUT("/users/:id", updateUserHandler)
+	admin.DELETE("/users/:id", deleteUserHandler)
+
+	// Role management
+	admin.GET("/roles", listRolesHandler)
+	admin.POST("/roles", createRoleHandler)
+	admin.PUT("/roles/:id", updateRoleHandler)
+	admin.DELETE("/roles/:id", deleteRoleHandler)
+
+	// Permission management
+	admin.GET("/permissions", listPermissionsHandler)
+	admin.POST("/permissions", createPermissionHandler)
+	admin.PUT("/permissions/:id", updatePermissionHandler)
+	admin.DELETE("/permissions/:id", deletePermissionHandler)
+
+	// Create server with timeout configuration
 	srv := &http.Server{
-		Addr:    fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port),
-		Handler: r,
+		Addr:         fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port),
+		Handler:      r,
+		ReadTimeout:  config.Server.ReadTimeout,
+		WriteTimeout: config.Server.WriteTimeout,
+		IdleTimeout:  config.Server.IdleTimeout,
 	}
 
 	// Start server in a goroutine
