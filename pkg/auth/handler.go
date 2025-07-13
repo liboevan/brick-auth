@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -195,4 +196,77 @@ func (h *Handler) GenerateToken(user *user.User) (string, time.Time, error) {
 // ValidateTokenString validates a token and returns claims (service-style method)
 func (h *Handler) ValidateTokenString(token string) (*Claims, error) {
 	return h.service.ValidateToken(token)
+}
+
+// DecodeToken handles token decoding with permission check
+func (h *Handler) DecodeToken(c *gin.Context) {
+	// Get token from Authorization header
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+		return
+	}
+
+	// Extract token from "Bearer <token>"
+	tokenParts := strings.Split(authHeader, " ")
+	if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header format"})
+		return
+	}
+
+	userToken := tokenParts[1]
+
+	// Validate user's token first
+	userClaims, err := h.service.ValidateToken(userToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user token"})
+		return
+	}
+
+	// Check if user has auth/token_decode permission
+	hasPermission := false
+	for _, perm := range userClaims.Permissions {
+		if perm == "auth/token_decode" {
+			hasPermission = true
+			break
+		}
+	}
+
+	if !hasPermission {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to decode tokens"})
+		return
+	}
+
+	// Get token to decode from request body
+	var req struct {
+		Token string `json:"token" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token to decode is required"})
+		return
+	}
+
+	// Decode the target token
+	targetClaims, err := h.service.ValidateToken(req.Token)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid token to decode"})
+		return
+	}
+
+	// Return decoded token information
+	c.JSON(http.StatusOK, gin.H{
+		"header": gin.H{
+			"alg": "HS256",
+			"typ": "JWT",
+		},
+		"payload": gin.H{
+			"user_id":    targetClaims.UserID,
+			"username":   targetClaims.Username,
+			"role":       targetClaims.Role,
+			"permissions": targetClaims.Permissions,
+			"exp":        targetClaims.ExpiresAt.Unix(),
+			"iat":        targetClaims.IssuedAt.Unix(),
+		},
+	})
 }

@@ -65,6 +65,7 @@ func (r *Router) setupRoutes() {
 	r.engine.GET("/validate", r.authHandler.ValidateToken)  // Also support GET for hub compatibility
 	r.engine.POST("/refresh", r.authHandler.RefreshToken)
 	r.engine.GET("/me", r.authHandler.Me)
+	r.engine.POST("/token/decode", r.authHandler.DecodeToken)
 
 	// Super-admin management routes
 	admin := r.engine.Group("/admin")

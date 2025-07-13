@@ -133,5 +133,14 @@
     "action": "delete",
     "created_at": "2024-01-01T00:00:00Z",
     "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 16,
+    "name": "auth/token_decode",
+    "description": "Decode and verify JWT tokens",
+    "resource": "auth",
+    "action": "token_decode",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
   }
 ] 
