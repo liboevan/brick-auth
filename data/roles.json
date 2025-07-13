@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "name": "super-admin",
+    "description": "Super administrator with all permissions",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 2,
+    "name": "admin",
+    "description": "Administrator with most permissions",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 3,
+    "name": "user",
+    "description": "Regular user with basic permissions",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
+] 

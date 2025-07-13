@@ -1,4 +1,4 @@
-package main
+package user
 
 import (
 	"time"
@@ -74,31 +74,6 @@ type Claims struct {
 	Role        string   `json:"role"`
 	Permissions []string `json:"permissions"`
 	jwt.RegisteredClaims
-}
-
-// LoginRequest represents login request
-type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-// LoginResponse represents login response
-type LoginResponse struct {
-	Token        string    `json:"token"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	User         UserInfo  `json:"user"`
-	Permissions  []string  `json:"permissions"`
-}
-
-// UserInfo represents user information for responses
-type UserInfo struct {
-	ID        uint   `json:"id"`
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Role      string `json:"role"`
-	IsActive  bool   `json:"is_active"`
 }
 
 // CreateUserRequest represents user creation request

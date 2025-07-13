@@ -14,6 +14,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+
+	"brick-auth/pkg/config"
+	"brick-auth/pkg/database"
+	"brick-auth/pkg/httpapi"
+	"brick-auth/pkg/models"
 )
 
 // Global variables

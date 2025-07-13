@@ -1,0 +1,137 @@
+[
+  {
+    "id": 1,
+    "name": "clock/view",
+    "description": "View clock status",
+    "resource": "clock",
+    "action": "view",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 2,
+    "name": "clock/server_mode",
+    "description": "Manage clock server mode",
+    "resource": "clock",
+    "action": "server_mode",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 3,
+    "name": "clock/servers",
+    "description": "Manage clock servers",
+    "resource": "clock",
+    "action": "servers",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 4,
+    "name": "user/read",
+    "description": "Read user information",
+    "resource": "user",
+    "action": "read",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 5,
+    "name": "user/create",
+    "description": "Create new users",
+    "resource": "user",
+    "action": "create",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 6,
+    "name": "user/update",
+    "description": "Update user information",
+    "resource": "user",
+    "action": "update",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 7,
+    "name": "user/delete",
+    "description": "Delete users",
+    "resource": "user",
+    "action": "delete",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 8,
+    "name": "role/read",
+    "description": "Read role information",
+    "resource": "role",
+    "action": "read",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 9,
+    "name": "role/create",
+    "description": "Create new roles",
+    "resource": "role",
+    "action": "create",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 10,
+    "name": "role/update",
+    "description": "Update role information",
+    "resource": "role",
+    "action": "update",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 11,
+    "name": "role/delete",
+    "description": "Delete roles",
+    "resource": "role",
+    "action": "delete",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 12,
+    "name": "permission/read",
+    "description": "Read permission information",
+    "resource": "permission",
+    "action": "read",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 13,
+    "name": "permission/create",
+    "description": "Create new permissions",
+    "resource": "permission",
+    "action": "create",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 14,
+    "name": "permission/update",
+    "description": "Update permission information",
+    "resource": "permission",
+    "action": "update",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  },
+  {
+    "id": 15,
+    "name": "permission/delete",
+    "description": "Delete permissions",
+    "resource": "permission",
+    "action": "delete",
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T00:00:00Z"
+  }
+] 

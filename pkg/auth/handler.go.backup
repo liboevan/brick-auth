@@ -1,0 +1,170 @@
+package auth
+
+import (
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
+)
+
+// AuthHandler handles authentication HTTP requests
+type AuthHandler struct {
+	jwtService *JWTService
+	userService UserService
+}
+
+// NewAuthHandler creates a new auth handler
+func NewAuthHandler(jwtService *JWTService, userService UserService) *AuthHandler {
+	return &AuthHandler{
+		jwtService:  jwtService,
+		userService: userService,
+	}
+}
+
+// LoginRequest represents login request
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+// LoginResponse represents login response
+type LoginResponse struct {
+	Token        string    `json:"token"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	User         UserInfo  `json:"user"`
+	Permissions  []string  `json:"permissions"`
+}
+
+// ValidateRequest represents token validation request
+type ValidateRequest struct {
+	Token string `json:"token" binding:"required"`
+}
+
+// ValidateResponse represents token validation response
+type ValidateResponse struct {
+	Valid       bool     `json:"valid"`
+	UserID      uint     `json:"user_id,omitempty"`
+	Username    string   `json:"username,omitempty"`
+	Role        string   `json:"role,omitempty"`
+	Permissions []string `json:"permissions,omitempty"`
+}
+
+// UserInfo represents user information for responses
+type UserInfo struct {
+	ID        uint   `json:"id"`
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Role      string `json:"role"`
+	IsActive  bool   `json:"is_active"`
+}
+
+// Login handles user login
+func (h *AuthHandler) Login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	// Get user by username
+	user, err := h.userService.GetUserByUsername(req.Username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+
+	// Verify password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+
+	// Get user permissions
+	permissions, err := h.userService.GetUserPermissions(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user permissions"})
+		return
+	}
+
+	// Generate token
+	token, err := h.jwtService.GenerateToken(user.ID, user.Username, user.Role.Name, permissions, 24*time.Hour)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	expiresAt := time.Now().Add(24 * time.Hour)
+	userInfo := UserInfo{
+		ID:        user.ID,
+		Username:  user.Username,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Role:      user.Role.Name,
+		IsActive:  user.IsActive,
+	}
+
+	response := LoginResponse{
+		Token:       token,
+		ExpiresAt:   expiresAt,
+		User:        userInfo,
+		Permissions: permissions,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// ValidateToken validates a JWT token
+func (h *AuthHandler) ValidateToken(c *gin.Context) {
+	var req ValidateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	claims, err := h.jwtService.ValidateToken(req.Token)
+	if err != nil {
+		c.JSON(http.StatusOK, ValidateResponse{Valid: false})
+		return
+	}
+
+	response := ValidateResponse{
+		Valid:       true,
+		UserID:      claims.UserID,
+		Username:    claims.Username,
+		Role:        claims.Role,
+		Permissions: claims.Permissions,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// UserService interface for user operations
+type UserService interface {
+	GetUserByUsername(username string) (*User, error)
+	GetUserPermissions(userID uint) ([]string, error)
+}
+
+// User represents a user (imported from user module)
+type User struct {
+	ID        uint      `json:"id"`
+	Username  string    `json:"username"`
+	Password  string    `json:"-"`
+	Email     string    `json:"email"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	IsActive  bool      `json:"is_active"`
+	RoleID    uint      `json:"role_id"`
+	Role      Role      `json:"role"`
+	LastLogin *time.Time `json:"last_login"`
+}
+
+// Role represents a role (imported from user module)
+type Role struct {
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+} 
