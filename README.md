@@ -34,16 +34,26 @@ Brick 认证服务，提供用户认证、JWT 令牌管理和权限控制功能�
 
 ```
 brick-auth/
-├── main.go                 # 主应用程序入口
-├── models.go               # 数据模型定义
-├── config.go               # 配置管理
-├── handlers.go             # API处理函数
-├── database.go             # 数据库管理
-├── Dockerfile             # Docker 构建文件
-├── go.mod                 # Go 模块文件
-├── private_rsa_pkcs1.pem # RSA 私钥文件
+├── cmd/                    # 应用程序入口
+│   ├── auth/              # 主认证服务
+│   └── seeder/            # 数据种子工具
+├── pkg/                   # 核心包
+│   ├── auth/              # 认证核心逻辑
+│   ├── user/              # 用户管理
+│   ├── httpapi/           # HTTP API 路由
+│   ├── config/            # 配置管理
+│   ├── database/          # 数据库管理
+│   └── models/            # 数据模型
+├── doc/                   # 文档
+│   ├── API_REFERENCE.md   # API 参考文档
+│   ├── DEPLOYMENT.md      # 部署指南
+│   └── DATABASE_REDESIGN.md # 数据库设计
 ├── scripts/               # 脚本文件
-│   └── test.sh
+├── data/                  # 数据文件
+├── config/                # 配置文件
+├── Dockerfile             # Docker 构建文件
+├── entrypoint.sh          # 容器入口脚本
+├── go.mod                 # Go 模块文件
 └── README.md             # 本文档
 ```
 
@@ -60,7 +70,7 @@ brick-auth/
 - `BRICK_AUTH_HOST` - 服务主机 (默认: 0.0.0.0)
 - `BRICK_AUTH_DB_PATH` - 数据库路径 (默认: /var/lib/brick-auth/auth.db)
 - `BRICK_AUTH_PRIVATE_KEY_PATH` - 私钥路径 (默认: /app/private.pem)
-- `BRICK_AUTH_TOKEN_EXPIRY` - 令牌过期时间 (默认: 15m)
+- `BRICK_AUTH_TOKEN_EXPIRY` - 令牌过期时间 (默认: 24h)
 - `BRICK_AUTH_PASSWORD_MIN_LENGTH` - 密码最小长度 (默认: 8)
 - `BRICK_AUTH_MAX_LOGIN_ATTEMPTS` - 最大登录尝试次数 (默认: 5)
 - `BRICK_AUTH_ENABLE_AUDIT_LOG` - 启用审计日志 (默认: true)
@@ -104,10 +114,34 @@ curl http://localhost:17001/version
 - `GET /validate` - 验证 JWT 令牌 (兼容性)
 - `POST /refresh` - 刷新令牌
 - `GET /me` - 获取当前用户信息
+- `POST /token/decode` - 解码令牌
 
 ### 系统端点
 - `GET /health` - 健康检查
 - `GET /version` - 版本信息
+
+### 超级管理员端点 (需要 super-admin 权限)
+
+#### 用户管理
+- `GET /admin/users` - 获取所有用户
+- `POST /admin/users` - 创建用户
+- `GET /admin/users/:id` - 获取用户详情
+- `PUT /admin/users/:id` - 更新用户
+- `DELETE /admin/users/:id` - 删除用户
+
+#### 角色管理
+- `GET /admin/roles` - 获取所有角色
+- `POST /admin/roles` - 创建角色
+- `GET /admin/roles/:id` - 获取角色详情
+- `PUT /admin/roles/:id` - 更新角色
+- `DELETE /admin/roles/:id` - 删除角色
+
+#### 权限管理
+- `GET /admin/permissions` - 获取所有权限
+- `POST /admin/permissions` - 创建权限
+- `GET /admin/permissions/:id` - 获取权限详情
+- `PUT /admin/permissions/:id` - 更新权限
+- `DELETE /admin/permissions/:id` - 删除权限
 
 ## 默认用户
 
@@ -181,7 +215,7 @@ curl http://localhost:17001/version
 - RSA 密钥对进行 JWT 签名
 - bcrypt 密码哈希
 - 基于角色的权限控制
-- 15分钟 JWT 令牌过期时间
+- 24小时 JWT 令牌过期时间
 - 支持 PKCS1 和 PKCS8 私钥格式
 - 自动会话和审计日志清理
 - CORS 支持
@@ -201,7 +235,7 @@ curl http://localhost:17001/version
 - 锁定时间：15分钟
 
 ### 会话管理
-- 令牌过期时间：15分钟
+- 令牌过期时间：24小时
 - 刷新令牌过期时间：7天
 - 会话过期时间：24小时
 
@@ -242,6 +276,10 @@ curl -X POST http://localhost:17001/login \
 # 测试令牌验证
 curl -H "Authorization: Bearer <token>" \
   http://localhost:17001/validate
+
+# 测试超级管理员API
+curl -H "Authorization: Bearer <super-admin-token>" \
+  http://localhost:17001/admin/users
 ```
 
 ## 文档
@@ -258,10 +296,12 @@ curl -H "Authorization: Bearer <token>" \
 - [x] 用户管理 API ✅
 - [x] 角色管理 API ✅
 - [x] 权限管理 API ✅
+- [x] JWT 令牌管理 ✅
+- [x] 会话管理 ✅
+- [x] 审计日志 ✅
 - [ ] 密码策略配置
 - [ ] 会话管理增强
 - [ ] 审计日志界面
-
 - [ ] 密码重置功能
 - [ ] 多因素认证
 - [ ] API 版本控制 
