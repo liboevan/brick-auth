@@ -266,7 +266,7 @@ curl http://localhost:17001/version
 docker ps | grep brick-auth
 
 # 查看服务日志
-docker logs el-brick-auth
+docker logs brick-auth
 
 # 测试认证端点
 curl -X POST http://localhost:17001/login \
@@ -304,4 +304,4 @@ curl -H "Authorization: Bearer <super-admin-token>" \
 - [ ] 审计日志界面
 - [ ] 密码重置功能
 - [ ] 多因素认证
-- [ ] API 版本控制 
+- [ ] API 版本控制

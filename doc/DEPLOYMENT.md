@@ -119,7 +119,7 @@ The auth service integrates with `brick-gateway` (nginx) for JWT validation:
 ```nginx
 # Add to nginx.conf
 upstream brick_auth {
-    server el-brick-auth:17001;
+    server brick-auth:17001;
 }
 
 # JWT validation
@@ -168,10 +168,10 @@ curl http://localhost:17001/version
 
 ```bash
 # View service logs
-docker logs el-brick-auth
+docker logs brick-auth
 
 # Follow logs in real-time
-docker logs -f el-brick-auth
+docker logs -f brick-auth
 ```
 
 ### Audit Logging
@@ -208,7 +208,7 @@ Audit logs are automatically created and rotated:
 1. **Service won't start**
    ```bash
    # Check logs
-   docker logs el-brick-auth
+   docker logs brick-auth
    
    # Verify configuration
    docker-compose config
@@ -234,17 +234,17 @@ Audit logs are automatically created and rotated:
 4. **Private key issues**
    ```bash
    # Check key file
-   docker exec el-brick-auth ls -la /app/private.pem
+   docker exec brick-auth ls -la /app/private.pem
    
    # Verify key format
-   docker exec el-brick-auth openssl rsa -in /app/private.pem -check
+   docker exec brick-auth openssl rsa -in /app/private.pem -check
    ```
 
 ### Debug Commands
 
 ```bash
 # Enter the container
-docker exec -it el-brick-auth sh
+docker exec -it brick-auth sh
 
 # Check service status
 ps aux | grep brick-auth
@@ -286,10 +286,10 @@ services:
 
 ```bash
 # Create backup
-docker exec el-brick-auth sqlite3 /var/lib/brick-auth/auth.db ".backup /tmp/auth_backup.db"
+docker exec brick-auth sqlite3 /var/lib/brick-auth/auth.db ".backup /tmp/auth_backup.db"
 
 # Copy backup from container
-docker cp el-brick-auth:/tmp/auth_backup.db ./auth_backup.db
+docker cp brick-auth:/tmp/auth_backup.db ./auth_backup.db
 ```
 
 ### Restore Database
@@ -349,6 +349,6 @@ Database schema changes are handled automatically on startup.
 ## Support
 
 For issues and questions:
-- Check the logs: `docker logs el-brick-auth`
+- Check the logs: `docker logs brick-auth`
 - Run tests: `./scripts/test.sh`
-- Review documentation in `/doc/` directory 
+- Review documentation in `/doc/` directory

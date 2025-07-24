@@ -266,7 +266,7 @@ Permissions use `resource/action` format:
 docker ps | grep brick-auth
 
 # View service logs
-docker logs el-brick-auth
+docker logs brick-auth
 
 # Test authentication endpoint
 curl -X POST http://localhost:17001/login \
@@ -304,4 +304,4 @@ For detailed documentation, see the `doc/` directory:
 - [ ] Audit Log Interface
 - [ ] Password Reset Functionality
 - [ ] Multi-Factor Authentication
-- [ ] API Versioning 
+- [ ] API Versioning

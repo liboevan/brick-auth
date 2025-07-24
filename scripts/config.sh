@@ -5,8 +5,8 @@
 
 # Project Configuration
 PROJECT_NAME="brick-auth"
-IMAGE_NAME="el/brick-auth"
-CONTAINER_NAME="el-brick-auth"
+IMAGE_NAME="brick-auth"
+CONTAINER_NAME="brick-auth"
 API_PORT="17001"
 DEFAULT_VERSION="0.1.0-dev"
 
@@ -80,4 +80,4 @@ check_api_health() {
     else
         echo "❌ API is not responding"
     fi
-} 
+}
