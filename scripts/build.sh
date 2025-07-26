@@ -15,8 +15,15 @@ print_info "Building with version: $VERSION"
 
 # Always run docker build from the brick-auth root directory
 cd "$SCRIPT_DIR/.."
-docker build -f Dockerfile --build-arg VERSION=$VERSION --build-arg BUILD_DATETIME=$BUILD_DATETIME -t $IMAGE_NAME:$VERSION -t $IMAGE_NAME:latest .
+echo "Current directory: $(pwd)"
+ls -la
+if [ ! -f "Dockerfile" ]; then
+  echo "Error: Dockerfile not found in $(pwd)"
+  exit 1
+fi
+IMAGE_NAME="brick-auth"
+docker build --no-cache -f Dockerfile --build-arg VERSION=$VERSION --build-arg BUILD_DATETIME=$BUILD_DATETIME -t $IMAGE_NAME:$VERSION -t $IMAGE_NAME:latest .
 
 print_info "Build completed!"
 print_info "Image: $IMAGE_NAME:$VERSION"
-print_info "Image: $IMAGE_NAME:latest" 
+print_info "Image: $IMAGE_NAME:latest"

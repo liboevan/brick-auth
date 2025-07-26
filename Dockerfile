@@ -11,6 +11,10 @@ RUN apk add --no-cache git ca-certificates tzdata gcc musl-dev sqlite-dev
 # Set working directory
 WORKDIR /app
 
+# Health check configuration
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:17001/health || exit 1
+
 # Copy go module files and download dependencies
 # This leverages Docker's layer caching
 COPY go.mod go.sum ./
@@ -37,7 +41,7 @@ RUN echo "${VERSION}" > /app/VERSION && \
 FROM alpine:latest
 
 # Install only necessary runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata sqlite
+RUN apk --no-cache add ca-certificates tzdata sqlite curl
 
 # Create a non-root user and group
 RUN addgroup -g 1001 -S brick && \
@@ -72,7 +76,7 @@ EXPOSE 17001
 
 # Set the health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:17001/health || exit 1
+    CMD curl -f http://localhost:17001/health || exit 1
 
 # Set the entrypoint
-ENTRYPOINT ["./entrypoint.sh"] 
+ENTRYPOINT ["./entrypoint.sh"]

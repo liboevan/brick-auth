@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+	"net/netip"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
@@ -20,7 +21,7 @@ import (
 	"gorm.io/gorm/logger"
 
 	"brick-auth/pkg/auth"
-	"brick-auth/pkg/httpapi"
+
 	"brick-auth/pkg/user"
 )
 
@@ -35,7 +36,7 @@ var (
 	authService   *auth.Service
 	userService   *user.Service
 	userHandler   *user.Handler
-	router        *httpapi.Router
+	router        *gin.Engine
 )
 
 // Config represents the application configuration
@@ -165,7 +166,18 @@ func initializeServices() {
 	userHandler = user.NewHandler(userService)
 	
 	// Initialize router
-	router = httpapi.NewRouter(db, authHandler, userHandler)
+	router = gin.Default()
+	router.Use(gin.Recovery())
+	router.Use(gin.Logger())
+
+	// Add health check endpoint with internal only access
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": "ok",
+			"version": AppVersion,
+			"database": "connected",
+		})
+	})
 }
 
 // cleanupExpiredSessions removes expired sessions
@@ -192,6 +204,46 @@ func cleanupOldAuditLogs() error {
 		log.Printf("Cleaned up %d old audit log entries", result.RowsAffected)
 	}
 	return nil
+}
+
+// isPrivateIP checks if an IP address is in a private range
+func isPrivateIP(ipStr string) bool {
+	ip, err := netip.ParseAddr(ipStr)
+	if err != nil {
+		return false
+	}
+
+	// Private IP ranges
+	privateRanges := []string{
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"127.0.0.0/8",
+	}
+
+	for _, cidr := range privateRanges {
+		prefix, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			continue
+		}
+		if prefix.Contains(ip) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// internalOnly middleware restricts access to internal IPs only
+func internalOnly() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		clientIP := c.ClientIP()
+		if !isPrivateIP(clientIP) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "access denied"})
+			return
+		}
+		c.Next()
+	}
 }
 
 // startCleanupRoutine starts the cleanup routine
@@ -266,7 +318,7 @@ func main() {
 	// Create server with timeout configuration
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%s", config.Server.Host, config.Server.Port),
-		Handler:      router.GetEngine(),
+		Handler:      router,
 		ReadTimeout:  config.Server.ReadTimeout,
 		WriteTimeout: config.Server.WriteTimeout,
 		IdleTimeout:  config.Server.IdleTimeout,
@@ -295,4 +347,4 @@ func main() {
 	}
 
 	log.Println("Server exiting")
-} 
+}
