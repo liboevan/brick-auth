@@ -23,6 +23,7 @@ import (
 	"brick-auth/pkg/auth"
 
 	"brick-auth/pkg/user"
+	"encoding/json"
 )
 
 // Global variables
@@ -177,6 +178,23 @@ func initializeServices() {
 			"version": AppVersion,
 			"database": "connected",
 		})
+	})
+
+	// Version endpoint
+	router.GET("/version", func(c *gin.Context) {
+		data, err := os.ReadFile("/app/build-info.json")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read version information"})
+			return
+		}
+		
+		var versionInfo map[string]interface{}
+		if err := json.Unmarshal(data, &versionInfo); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse version information"})
+			return
+		}
+		
+		c.JSON(http.StatusOK, versionInfo)
 	})
 }
 

@@ -141,8 +141,8 @@ func (r *Router) version(c *gin.Context) {
 // loadBuildInfo loads build information
 func (r *Router) loadBuildInfo() *BuildInfo {
 	return &BuildInfo{
-		Version:        "0.1.0-dev",
-		BuildDateTime:  "2025-07-10T13:00:00Z",
+		Version:        main.AppVersion,
+		BuildDateTime:  main.BuildDateTime,
 		BuildTimestamp: time.Now().Unix(),
 		Environment:    "production",
 		Service:        "brick-auth",
@@ -163,4 +163,4 @@ type BuildInfo struct {
 // GetEngine returns the gin engine
 func (r *Router) GetEngine() *gin.Engine {
 	return r.engine
-} 
+}
